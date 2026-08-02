@@ -30,7 +30,7 @@
     print(f"Mam {age} lat")
 
 # Typecasting
-    # the process of converting a variable from one data type to another, str(), int(), float(), bool ()
+    # the process of converting a variable from one data type to another, str(), int(), float(), bool()
 
     name = "Bro Code"
     age = 25
@@ -85,7 +85,7 @@
 
 # Math functions
     # Round
-    x = 3.14
+    x = 3.1415
     result_a = round(x, 3) # zaokrąglanie do danej liczby miejsc po przecinku
 
     # Absolute value
@@ -119,4 +119,8 @@
     else:
         print(False)
 
-    #
+    online = False
+    if online:
+        print(f"Status is online")
+    else:
+        print(f"Status is offline")
