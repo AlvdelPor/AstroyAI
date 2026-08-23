@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ciemne tło aplikacji -->
+  <rect width="512" height="512" fill="#0f172a" rx="100"/>
+  <defs>
+    <!-- Pastelowy gradient w stylu Gemini -->
+    <linearGradient id="geminiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4285f4" />
+      <stop offset="50%" stop-color="#9b72cb" />
+      <stop offset="100%" stop-color="#ff8a65" />
+    </linearGradient>
+  </defs>
+  <!-- Kropka AI na środku -->
+  <circle cx="256" cy="256" r="160" fill="url(#geminiGrad)" />
+</svg>
