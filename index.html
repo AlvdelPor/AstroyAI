@@ -6,8 +6,8 @@
     <title>Robot Oliwii</title>
     <style>
         body {
-            background-color: #121212;
-            color: white;
+            background-color: #0f172a; 
+            color: #e2e8f0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
@@ -21,18 +21,19 @@
         #orb {
             width: 150px;
             height: 150px;
-            background: linear-gradient(135deg, #00ff88, #00b3ff);
+            background: linear-gradient(135deg, #4285f4, #9b72cb, #ff8a65); 
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
-            transition: all 0.3s ease;
+            box-shadow: 0 0 25px rgba(155, 114, 203, 0.4);
+            transition: all 0.5s ease;
             display: flex;
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            font-size: 1.2rem;
-            color: #121212;
-            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #ffffff;
+            text-shadow: 0px 1px 4px rgba(0,0,0,0.4);
+            margin-bottom: 25px;
         }
 
         #orb:active {
@@ -40,44 +41,66 @@
         }
 
         .listening {
-            animation: pulse 1.5s infinite;
-            background: linear-gradient(135deg, #ff0055, #ffaa00) !important;
-            box-shadow: 0 0 40px rgba(255, 0, 85, 0.6) !important;
+            animation: organicPulse 3s infinite;
+            background: linear-gradient(135deg, #ff758c, #ff7eb3, #9b72cb) !important;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        .thinking {
+            animation: organicPulse 2.5s infinite;
+            background: linear-gradient(135deg, #00f2fe, #4facfe, #9b72cb) !important;
+        }
+
+        .speaking {
+            animation: organicPulse 3.5s infinite;
+        }
+
+        @keyframes organicPulse {
+            0% { transform: scale(1); box-shadow: 0 0 20px rgba(155, 114, 203, 0.4); }
+            25% { transform: scale(1.06); box-shadow: 0 0 35px rgba(155, 114, 203, 0.7); }
+            50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(155, 114, 203, 0.5); }
+            75% { transform: scale(1.08); box-shadow: 0 0 40px rgba(155, 114, 203, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 20px rgba(155, 114, 203, 0.4); }
         }
 
         #chat-box {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
             padding: 20px;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 600px;
-            min-height: 120px;
+            border-radius: 20px;
+            width: 85%;
+            max-width: 500px;
+            height: 120px;
+            overflow-y: auto;
             margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .user-text { 
-            color: #00ff88; 
-            margin-bottom: 15px; 
-            font-size: 1.1rem;
+            color: #94a3b8; 
+            margin-bottom: 12px; 
+            font-size: 1rem;
+            font-style: italic;
         }
         
         .robot-text { 
-            color: #00b3ff; 
-            font-size: 1.6rem; 
+            color: #e2e8f0; 
+            font-size: 1.25rem; 
             font-weight: bold;
             line-height: 1.4;
         }
         
         #esp-simulator {
             font-size: 4rem;
-            margin-top: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
             transition: 0.3s;
+        }
+
+        #status {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -85,7 +108,6 @@
 
     <div id="orb">START</div>
     <div id="esp-simulator">😐</div>
-    <p style="font-size: 0.8rem; color: #888;">Symulator twarzy robota</p>
 
     <div id="chat-box">
         <div id="status">Naciśnij START, aby obudzić robota</div>
@@ -95,9 +117,12 @@
 
     <script>
         // ==========================================
-        // WKLEJ SWÓJ KLUCZ PONIŻEJ
-        const API_KEY = "AQ.Ab8RN6JtjsVAhQDg9_8sW19cBAJ5zXKEx80NKia7Dicpg_X0rg"; 
+        // WKLEJ SWÓJ NOWY KLUCZ PONIŻEJ
+        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; 
         // ==========================================
+
+        // Tablica przechowująca całą historię konwersacji
+        let historiaRozmowy = [];
 
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
@@ -110,15 +135,22 @@
         recognition.lang = 'pl-PL';
         recognition.interimResults = false;
 
+        let dostepneGlosy = [];
+        window.speechSynthesis.onvoiceschanged = () => {
+            dostepneGlosy = window.speechSynthesis.getVoices();
+        };
+
         orb.addEventListener('click', () => {
-            simulateESP32("HAPPY");
-            speakText("Cześć Oliwia! Jestem gotowy. O czym dzisiaj porozmawiamy?");
+            if (orb.innerText === "START") {
+                status.style.display = 'none'; 
+                simulateESP32("HAPPY");
+                speakText("Cześć Oliwia! Jestem gotowy. O czym dzisiaj porozmawiamy?");
+            }
         });
 
         function startListening() {
-            status.innerText = "Słucham Cię...";
-            orb.classList.add('listening');
-            orb.innerText = "SŁUCHA";
+            orb.className = 'listening';
+            orb.innerText = "Słucham...";
             recognition.start();
         }
 
@@ -127,32 +159,34 @@
             userMsg.innerText = "Ty: " + transcript;
             robotMsg.innerText = "";
             
-            orb.classList.remove('listening');
-            orb.innerText = "MYŚLI";
-            status.innerText = "Wysyłam do mózgu...";
+            orb.className = 'thinking';
+            orb.innerText = "Myślę...";
             
             askGemini(transcript); 
         };
 
         recognition.onerror = (event) => {
-            status.innerText = "Nie usłyszałem. Naciśnij ponownie.";
-            orb.classList.remove('listening');
+            orb.className = '';
             orb.innerText = "BŁĄD";
+            orb.onclick = () => { startListening(); };
         };
 
         async function askGemini(text) {
             simulateESP32("THINKING");
             
-            // Poprawiony prompt - prosimy o krótkie odpowiedzi, ale bez wymuszania matematycznych limitów
-            const promptSystemowy = "Jesteś uroczym, małym robotem biurkowym Oliwii. Jesteś jej kumplem, odpowiadasz na luzie. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
+            const promptSystemowy = "Jesteś biurkowym robotem Macieja, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
+
+            // Zapisujemy Twoją wiadomość do historii
+            historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
+
             try {
-                // Używamy wersji LITE, która jest najszybsza!
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: promptSystemowy }] },
-                        contents: [{ parts: [{ text: text }] }]
+                        contents: historiaRozmowy, // Wysyłamy całą historię
+                        generationConfig: { temperature: 0.3 }
                     })
                 });
 
@@ -161,14 +195,20 @@
                 if(data.error) {
                     robotMsg.innerText = "Błąd API: " + data.error.message;
                     speakText("Wystąpił błąd.");
+                    historiaRozmowy.pop(); // Usuwamy błędne zapytanie z historii
                     return;
                 }
 
                 const aiText = data.candidates[0].content.parts[0].text;
+                
+                // Zapisujemy odpowiedź robota do historii
+                historiaRozmowy.push({ role: "model", parts: [{ text: aiText }] });
+                
                 processAIResponse(aiText);
 
             } catch (error) {
                 robotMsg.innerText = "Błąd sieci: " + error;
+                historiaRozmowy.pop();
             }
         }
 
@@ -179,7 +219,7 @@
             if (match) {
                 const emotion = match[1].toUpperCase();
                 simulateESP32(emotion); 
-                textToSpeak = fullText.replace(match[0], '').trim(); 
+                textToSpeak = fullText.replace(/\[.*?\]/g, '').trim(); 
             }
 
             robotMsg.innerText = textToSpeak; 
@@ -191,24 +231,19 @@
             else if(emotion === "SAD") espSimulator.innerText = "😢";
             else if(emotion === "ANGRY") espSimulator.innerText = "😡";
             else if(emotion === "THINKING") espSimulator.innerText = "🤔";
+            else if(emotion === "CONFUSED") espSimulator.innerText = "😕";
+            else if(emotion === "SURPRISED") espSimulator.innerText = "😲";
+            else if(emotion === "SCARED") espSimulator.innerText = "😨";
             else espSimulator.innerText = "🤖"; 
         }
-
-        // Ładowanie dostępnych głosów z telefonu
-        let dostepneGlosy = [];
-        window.speechSynthesis.onvoiceschanged = () => {
-            dostepneGlosy = window.speechSynthesis.getVoices();
-        };
 
         function speakText(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pl-PL';
             utterance.rate = 1.0; 
             
-            // Szukamy najlepszego polskiego głosu
             const polskieGlosy = dostepneGlosy.filter(g => g.lang.includes('pl') || g.lang.includes('PL'));
             if (polskieGlosy.length > 0) {
-                // Preferujemy głosy Google, bo brzmią najbardziej naturalnie
                 const lepszyGlos = polskieGlosy.find(g => g.name.includes('Google'));
                 utterance.voice = lepszyGlos ? lepszyGlos : polskieGlosy[0];
             }
@@ -217,8 +252,10 @@
                 startListening();
             };
 
+            orb.className = 'speaking';
+            orb.innerText = ""; 
+
             window.speechSynthesis.speak(utterance);
-            orb.innerText = "GADA";
         }
     </script>
 </body>
