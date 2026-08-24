@@ -1,6 +1,6 @@
 {
-  "name": "Robot Oliwii",
-  "short_name": "Robot",
+  "name": "AstroyAI",
+  "short_name": "AstroyAI",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robot Oliwii</title>
+    <title>AstroyAI</title>
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -102,7 +102,7 @@
     <div id="esp-simulator">😐</div>
 
     <div id="chat-box">
-        <div id="status">Naciśnij START, aby obudzić robota</div>
+        <div id="status">Naciśnij START, aby obudzić AstroyAI</div>
         <div id="user-msg" class="user-text"></div>
         <div id="robot-msg" class="robot-text"></div>
     </div>
@@ -122,7 +122,7 @@
         bleBtn.addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'Robot_Oliwii' }],
+                    filters: [{ name: 'Astroy' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 const server = await device.gatt.connect();
@@ -204,7 +204,7 @@
         async function askGemini(text) {
             simulateESP32("THINKING");
             
-            const promptSystemowy = "Jesteś biurkowym robotem Macieja, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
+            const promptSystemowy = "Jesteś biurkowym robotem Macieja (nazywasz sie Astroy), jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
 
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
 
