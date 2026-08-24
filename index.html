@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Robot Oliwii</title>
     
-    <!-- PWA - Wymuszenie pełnego ekranu i kolorów -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     
-    <!-- Link do manifestu i nowej ikony PNG -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
@@ -29,6 +27,22 @@
             text-align: center;
         }
         
+        /* Nowy przycisk Bluetooth */
+        #ble-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
         #orb {
             width: 150px;
             height: 150px;
@@ -47,23 +61,10 @@
             margin-bottom: 25px;
         }
 
-        #orb:active {
-            transform: scale(0.95);
-        }
-
-        .listening {
-            animation: organicPulse 3s infinite;
-            background: linear-gradient(135deg, #ff758c, #ff7eb3, #9b72cb) !important;
-        }
-
-        .thinking {
-            animation: organicPulse 2.5s infinite;
-            background: linear-gradient(135deg, #00f2fe, #4facfe, #9b72cb) !important;
-        }
-
-        .speaking {
-            animation: organicPulse 3.5s infinite;
-        }
+        #orb:active { transform: scale(0.95); }
+        .listening { animation: organicPulse 3s infinite; background: linear-gradient(135deg, #ff758c, #ff7eb3, #9b72cb) !important; }
+        .thinking { animation: organicPulse 2.5s infinite; background: linear-gradient(135deg, #00f2fe, #4facfe, #9b72cb) !important; }
+        .speaking { animation: organicPulse 3.5s infinite; }
 
         @keyframes organicPulse {
             0% { transform: scale(1); box-shadow: 0 0 20px rgba(155, 114, 203, 0.4); }
@@ -87,35 +88,15 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .user-text { 
-            color: #94a3b8; 
-            margin-bottom: 12px; 
-            font-size: 1rem;
-            font-style: italic;
-        }
-        
-        .robot-text { 
-            color: #e2e8f0; 
-            font-size: 1.25rem; 
-            font-weight: bold;
-            line-height: 1.4;
-        }
-        
-        #esp-simulator {
-            font-size: 4rem;
-            margin-top: 5px;
-            margin-bottom: 15px;
-            transition: 0.3s;
-        }
-
-        #status {
-            color: #64748b;
-            font-size: 0.9rem;
-            margin-bottom: 10px;
-        }
+        .user-text { color: #94a3b8; margin-bottom: 12px; font-size: 1rem; font-style: italic; }
+        .robot-text { color: #e2e8f0; font-size: 1.25rem; font-weight: bold; line-height: 1.4; }
+        #esp-simulator { font-size: 4rem; margin-top: 5px; margin-bottom: 15px; transition: 0.3s; }
+        #status { color: #64748b; font-size: 0.9rem; margin-bottom: 10px; }
     </style>
 </head>
 <body>
+
+    <button id="ble-btn">Połącz Bluetooth</button>
 
     <div id="orb">START</div>
     <div id="esp-simulator">😐</div>
@@ -127,13 +108,50 @@
     </div>
 
     <script>
-        // ==========================================
-        // WKLEJ SWÓJ NOWY KLUCZ PONIŻEJ
-        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; 
-        // ==========================================
-
-        // Tablica przechowująca całą historię konwersacji
+        const API_KEY = "TUTAJ_WKLEJ_SWOJ_KLUCZ"; 
         let historiaRozmowy = [];
+
+        // ==========================================
+        // OBSŁUGA BLUETOOTH
+        // ==========================================
+        let bleCharacteristic = null;
+        const bleBtn = document.getElementById('ble-btn');
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        bleBtn.addEventListener('click', async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Robot_Oliwii' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                
+                bleBtn.innerText = "Połączono";
+                bleBtn.style.background = "rgba(0, 255, 136, 0.2)";
+                bleBtn.style.color = "#00ff88";
+                bleBtn.style.borderColor = "#00ff88";
+                
+                sendToESP32("IDLE"); // Domyślny stan po połączeniu
+            } catch (error) {
+                console.log("Błąd łączenia: ", error);
+                alert("Nie udało się połączyć. Upewnij się, że robot jest włączony, a telefon ma aktywny Bluetooth i Lokalizację.");
+            }
+        });
+
+        async function sendToESP32(emotion) {
+            if (bleCharacteristic) {
+                try {
+                    let encoder = new TextEncoder();
+                    await bleCharacteristic.writeValue(encoder.encode(emotion));
+                } catch (error) {
+                    console.error("Błąd wysyłania: ", error);
+                }
+            }
+        }
+        // ==========================================
 
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
@@ -162,6 +180,7 @@
         function startListening() {
             orb.className = 'listening';
             orb.innerText = "Słucham...";
+            sendToESP32("IDLE"); // Wracamy do oddychania, gdy słucha
             recognition.start();
         }
 
@@ -187,7 +206,6 @@
             
             const promptSystemowy = "Jesteś biurkowym robotem Macieja, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
 
-            // Zapisujemy Twoją wiadomość do historii
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
 
             try {
@@ -196,7 +214,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: promptSystemowy }] },
-                        contents: historiaRozmowy, // Wysyłamy całą historię
+                        contents: historiaRozmowy,
                         generationConfig: { temperature: 0.3 }
                     })
                 });
@@ -206,15 +224,12 @@
                 if(data.error) {
                     robotMsg.innerText = "Błąd API: " + data.error.message;
                     speakText("Wystąpił błąd.");
-                    historiaRozmowy.pop(); // Usuwamy błędne zapytanie z historii
+                    historiaRozmowy.pop();
                     return;
                 }
 
                 const aiText = data.candidates[0].content.parts[0].text;
-                
-                // Zapisujemy odpowiedź robota do historii
                 historiaRozmowy.push({ role: "model", parts: [{ text: aiText }] });
-                
                 processAIResponse(aiText);
 
             } catch (error) {
@@ -238,6 +253,7 @@
         }
 
         function simulateESP32(emotion) {
+            // Animacja na stronie PWA
             if(emotion === "HAPPY") espSimulator.innerText = "😄";
             else if(emotion === "SAD") espSimulator.innerText = "😢";
             else if(emotion === "ANGRY") espSimulator.innerText = "😡";
@@ -246,6 +262,9 @@
             else if(emotion === "SURPRISED") espSimulator.innerText = "😲";
             else if(emotion === "SCARED") espSimulator.innerText = "😨";
             else espSimulator.innerText = "🤖"; 
+            
+            // Wysłanie emocji fizycznie do robota
+            sendToESP32(emotion);
         }
 
         function speakText(text) {
