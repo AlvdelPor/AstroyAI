@@ -96,7 +96,7 @@
 </head>
 <body>
 
-    <button id="ble-btn">Połącz Bluetooth</button>
+    <button id="ble-btn">Połącz</button>
 
     <div id="orb">START</div>
     <div id="esp-simulator">😐</div>
@@ -130,6 +130,8 @@
                 bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
                 
                 bleBtn.innerText = "Połączono";
+                document.getElementById('esp-simulator').style.display = 'none';
+                document.getElementById('orb').style.transform = 'scale(1.2)';
                 bleBtn.style.background = "rgba(0, 255, 136, 0.2)";
                 bleBtn.style.color = "#00ff88";
                 bleBtn.style.borderColor = "#00ff88";
