@@ -110,6 +110,28 @@
     <script>
         const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; 
         let historiaRozmowy = [];
+        let czyAIPrzetwarza = false; // Flaga blokująca usypianie podczas myślenia
+        let wakeLock = null; // Blokada wygaszacza ekranu
+
+        // ==========================================
+        // WAKE LOCK - Blokowanie gaszenia ekranu
+        // ==========================================
+        async function wlaczWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log(`Błąd Wake Lock: ${err.message}`);
+            }
+        }
+        
+        // Ponów blokadę, gdyby użytkownik zminimalizował aplikację i wrócił
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                wlaczWakeLock();
+            }
+        });
 
         // ==========================================
         // OBSŁUGA BLUETOOTH
@@ -122,7 +144,7 @@
         bleBtn.addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'Astroy' }],
+                    filters: [{ name: 'Astory' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 const server = await device.gatt.connect();
@@ -130,19 +152,17 @@
                 bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
                 
                 bleBtn.innerText = "Połączono";
-                document.getElementById('esp-simulator').style.display = 'none';
-                const orbElement = document.getElementById('orb');
-                orbElement.style.transform = 'scale(1.2)';
-                orbElement.style.marginTop = '60px';
-                orbElement.style.marginBottom = '70px';
                 bleBtn.style.background = "rgba(0, 255, 136, 0.2)";
                 bleBtn.style.color = "#00ff88";
                 bleBtn.style.borderColor = "#00ff88";
                 
-                sendToESP32("IDLE"); // Domyślny stan po połączeniu
+                // POPRAWKA UI: Usuwamy symulator twarzy i powiększamy kulę, Flexbox resztę wyśrodkuje sam!
+                document.getElementById('esp-simulator').style.display = 'none';
+                document.getElementById('orb').style.transform = 'scale(1.15)';
+                
+                sendToESP32("IDLE"); 
             } catch (error) {
                 console.log("Błąd łączenia: ", error);
-                alert("Nie udało się połączyć. Upewnij się, że robot jest włączony, a telefon ma aktywny Bluetooth i Lokalizację.");
             }
         });
 
@@ -174,22 +194,29 @@
             dostepneGlosy = window.speechSynthesis.getVoices();
         };
 
+        // GŁÓWNY PRZYCISK (KULA)
         orb.addEventListener('click', () => {
             if (orb.innerText === "START") {
+                wlaczWakeLock(); // Włącza blokadę wygaszacza ekranu
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
                 speakText("Cześć Maciej! Jestem gotowy. W czym mogę pomóc?");
+            } else if (orb.innerText === "Zzz...") {
+                // Wybudzanie z drzemki
+                startListening();
             }
         });
 
         function startListening() {
+            czyAIPrzetwarza = false;
             orb.className = 'listening';
             orb.innerText = "Słucham...";
-            sendToESP32("IDLE"); // Wracamy do oddychania, gdy słucha
-            recognition.start();
+            sendToESP32("IDLE");
+            try { recognition.start(); } catch(e) {}
         }
 
         recognition.onresult = (event) => {
+            czyAIPrzetwarza = true; // Rozpoczęto myślenie, ignorujemy timeout mikrofonu
             const transcript = event.results[0][0].transcript;
             userMsg.innerText = "Ty: " + transcript;
             robotMsg.innerText = "";
@@ -200,16 +227,26 @@
             askGemini(transcript); 
         };
 
+        // NOWOŚĆ: Logika usypiania zamiast błędu
+        recognition.onend = () => {
+            if (!czyAIPrzetwarza) {
+                // Mikrofon wyłączył się z powodu ciszy
+                orb.className = '';
+                orb.innerText = "Zzz...";
+                sendToESP32("IDLE");
+            }
+        };
+
         recognition.onerror = (event) => {
-            orb.className = '';
-            orb.innerText = "BŁĄD";
-            orb.onclick = () => { startListening(); };
+            if (event.error !== 'no-speech') {
+                console.log("Błąd rozpoznawania:", event.error);
+            }
         };
 
         async function askGemini(text) {
             simulateESP32("THINKING");
             
-            const promptSystemowy = "Jesteś biurkowym robotem Macieja (nazywasz sie Astroy), jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy. Używaj różnych emocji z dostepnych.";
+            const promptSystemowy = "Jesteś biurkowym robotem Macieja o imieniu Astory, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
 
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
 
@@ -228,8 +265,8 @@
                 
                 if(data.error) {
                     robotMsg.innerText = "Błąd API: " + data.error.message;
-                    speakText("Wystąpił błąd.");
                     historiaRozmowy.pop();
+                    orb.innerText = "Zzz...";
                     return;
                 }
 
@@ -240,6 +277,7 @@
             } catch (error) {
                 robotMsg.innerText = "Błąd sieci: " + error;
                 historiaRozmowy.pop();
+                orb.innerText = "Zzz...";
             }
         }
 
@@ -258,7 +296,6 @@
         }
 
         function simulateESP32(emotion) {
-            // Animacja na stronie PWA
             if(emotion === "HAPPY") espSimulator.innerText = "😄";
             else if(emotion === "SAD") espSimulator.innerText = "😢";
             else if(emotion === "ANGRY") espSimulator.innerText = "😡";
@@ -268,7 +305,6 @@
             else if(emotion === "SCARED") espSimulator.innerText = "😨";
             else espSimulator.innerText = "🤖"; 
             
-            // Wysłanie emocji fizycznie do robota
             sendToESP32(emotion);
         }
 
