@@ -58,40 +58,67 @@ void setup() {
 void drawFace(String emotion) {
     display.clearDisplay();
     long time = millis();
-    bool isBlinking = (time % 3000 < 200); // Szybkie mrugnięcie co 3 sekundy
+    bool isBlinking = (time % 3000 < 200); // Mrugnięcie co 3 sekundy
 
-    int eyeW = 28;  // Szerokość oka
-    int eyeH = 34;  // Wysokość oka
-    int leftX = 20; // Pozycja lewego oka
-    int rightX = 128 - 20 - eyeW; // Pozycja prawego oka
-    int y = 15;     // Pozycja w pionie
+    int w = 26; // Szerokość oka
+    int h = 32; // Wysokość oka
+    int leftX = 22; 
+    int rightX = 128 - 22 - w; 
+    int y = 16; 
 
-    if (isBlinking) { 
-        eyeH = 4; // Zamknięte oczy (kreski)
-        y = 30; 
-    }
+    if (isBlinking) { h = 4; y = 30; } // Zamknięte oczy przy mruganiu
 
     if (emotion == "HAPPY") {
-        // Szczęśliwe, wygięte w łuk oczy
-        display.fillRoundRect(leftX, y, eyeW, eyeH, 8, WHITE);
-        display.fillRoundRect(rightX, y, eyeW, eyeH, 8, WHITE);
-        display.fillRect(0, y + 15, 128, 20, BLACK); // Ucinamy dół prostokątem
-    }
+        // Radosne łuki (ucina dół czarnym prostokątem)
+        display.fillRoundRect(leftX, y, w, h, 8, WHITE);
+        display.fillRoundRect(rightX, y, w, h, 8, WHITE);
+        display.fillRect(0, y + 16, 128, 20, BLACK); 
+    } 
+    else if (emotion == "SAD") {
+        // Smutne, opadające na zewnątrz oczy + animowana łza
+        display.fillRoundRect(leftX, y, w, h, 8, WHITE);
+        display.fillRoundRect(rightX, y, w, h, 8, WHITE);
+        display.fillTriangle(leftX, y-5, leftX+w+5, y+5, leftX, y+20, BLACK); 
+        display.fillTriangle(rightX+w, y-5, rightX-5, y+5, rightX+w, y+20, BLACK);
+        if(!isBlinking) display.fillCircle(leftX + w/2, y + h + ((time/50)%15), 3, WHITE); 
+    } 
     else if (emotion == "ANGRY") {
-        // Groźne, ścięte do środka brwi
-        display.fillRoundRect(leftX, y, eyeW, eyeH, 8, WHITE);
-        display.fillRoundRect(rightX, y, eyeW, eyeH, 8, WHITE);
-        display.fillTriangle(leftX, y-5, leftX+eyeW+10, y+15, leftX, y+15, BLACK);
-        display.fillTriangle(rightX+eyeW, y-5, rightX-10, y+15, rightX+eyeW, y+15, BLACK);
-    }
+        // Wściekłe, ścięte do środka brwi
+        display.fillRoundRect(leftX, y, w, h, 8, WHITE);
+        display.fillRoundRect(rightX, y, w, h, 8, WHITE);
+        display.fillTriangle(leftX, y-5, leftX+w+10, y+16, leftX, y+16, BLACK);
+        display.fillTriangle(rightX+w, y-5, rightX-10, y+16, rightX+w, y+16, BLACK);
+    } 
+    else if (emotion == "SURPRISED") {
+        // Wielkie, okrągłe oczy z czarnymi źrenicami
+        display.fillCircle(leftX + w/2, y + h/2, 16, WHITE);
+        display.fillCircle(rightX + w/2, y + h/2, 16, WHITE);
+        display.fillCircle(leftX + w/2, y + h/2, 6, BLACK);
+        display.fillCircle(rightX + w/2, y + h/2, 6, BLACK);
+    } 
+    else if (emotion == "SCARED") {
+        // Przestraszone, małe, trzęsące się oczka
+        int shake = (time / 40) % 4; 
+        display.fillRoundRect(leftX + shake - 10, y, 12, 12, 4, WHITE);
+        display.fillRoundRect(rightX - shake + 10, y, 12, 12, 4, WHITE);
+    } 
+    else if (emotion == "CONFUSED") {
+        // Zdezorientowany: jedno oko duże, drugie małe
+        display.fillRoundRect(leftX, y, w, h, 8, WHITE); 
+        display.fillRoundRect(rightX, y+12, w-10, h-12, 4, WHITE); 
+    } 
+    else if (emotion == "THINKING") {
+        // Zamyślony: patrzy w górny prawy róg
+        display.fillRoundRect(leftX + 8, y - 6, w, h, 8, WHITE); 
+        display.fillRoundRect(rightX + 8, y - 6, w, h, 8, WHITE);
+    } 
     else { 
-        // IDLE / THINKING / SAD - rozglądanie się
-        int offsetX = (time / 1500) % 2 == 0 ? 6 : -6; 
-        if (emotion == "THINKING") offsetX = 0; // Skupienie na wprost
-
-        display.fillRoundRect(leftX + offsetX, y, eyeW, eyeH, 8, WHITE);
-        display.fillRoundRect(rightX + offsetX, y, eyeW, eyeH, 8, WHITE);
+        // IDLE: Swobodne rozglądanie się
+        int offsetX = (time / 2000) % 2 == 0 ? 5 : -5; 
+        display.fillRoundRect(leftX + offsetX, y, w, h, 8, WHITE);
+        display.fillRoundRect(rightX + offsetX, y, w, h, 8, WHITE);
     }
+    
     display.display();
 }
 
