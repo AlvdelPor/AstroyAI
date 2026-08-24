@@ -110,7 +110,7 @@
     </div>
 
     <script>
-        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; 
+        const API_KEY = ""; 
         let historiaRozmowy = [];
         let czyAIPrzetwarza = false; // Flaga blokująca usypianie podczas myślenia
         let wakeLock = null; // Blokada wygaszacza ekranu
@@ -146,7 +146,7 @@
         bleBtn.addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'Astory' }],
+                    filters: [{ name: 'Astroy' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 const server = await device.gatt.connect();
