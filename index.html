@@ -23,7 +23,9 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100vw;
             margin: 0;
+            overflow: hidden;
             text-align: center;
         }
         
@@ -197,13 +199,20 @@
         // GŁÓWNY PRZYCISK (KULA)
         orb.addEventListener('click', () => {
             if (orb.innerText === "START") {
-                wlaczWakeLock(); // Włącza blokadę wygaszacza ekranu
+                wlaczWakeLock();
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
                 speakText("Cześć Maciej! Jestem gotowy. W czym mogę pomóc?");
-            } else if (orb.innerText === "Zzz...") {
-                // Wybudzanie z drzemki
+            } else if (orb.innerText === "Zzz..." || orb.innerText === "BŁĄD") {
+                // Wybudzanie
                 startListening();
+            } else if (orb.innerText === "Słucham...") {
+                // Bezpiecznik: jeśli się zawiesi, kliknięcie usypia go ręcznie
+                try { recognition.stop(); } catch(e) {}
+                czyAIPrzetwarza = false;
+                orb.className = '';
+                orb.innerText = "Zzz...";
+                sendToESP32("IDLE");
             }
         });
 
