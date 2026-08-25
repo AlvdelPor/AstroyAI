@@ -109,18 +109,15 @@
     </div>
 
     <script>
-        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; // <--- ZAPAMIĘTAJ O WKLEJENIU KLUCZA
+        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg";
         let historiaRozmowy = [];
         let czyAIPrzetwarza = false; 
         let wakeLock = null; 
         
         let trybKomendy = false; 
         let audioCtx = null; 
-        let currentAbortController = null; // Kontroler zapytania AI do ręcznego resetowania
+        let currentAbortController = null;
 
-        // ==========================================
-        // DŹWIĘKI I WAKE LOCK
-        // ==========================================
         function zainicjujAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -149,9 +146,6 @@
             if (wakeLock !== null && document.visibilityState === 'visible') wlaczWakeLock();
         });
 
-        // ==========================================
-        // OBSŁUGA BLUETOOTH I UI
-        // ==========================================
         let bleCharacteristic = null;
         const bleBtn = document.getElementById('ble-btn');
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
@@ -172,11 +166,9 @@
                 bleBtn.style.color = "#00ff88";
                 bleBtn.style.borderColor = "#00ff88";
                 
-                // NAPRAWA UI: Emotikona staje się niewidoczna, ale zachowuje przestrzeń, więc czat nie drgnie.
                 document.getElementById('esp-simulator').style.visibility = 'hidden';
                 
-                // Kula powiększa się tylko o 5% i obniża o 3 piksele. W sam raz.
-                document.getElementById('orb').style.transform = 'scale(1.05) translateY(3px)';
+                document.getElementById('orb').style.transform = 'scale(1.05) translateY(5px)';
                 
                 sendToESP32("IDLE"); 
             } catch (error) {
@@ -192,7 +184,6 @@
                 } catch (error) {}
             }
         }
-        // ==========================================
 
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
@@ -210,22 +201,20 @@
             dostepneGlosy = window.speechSynthesis.getVoices();
         };
 
-        // GŁÓWNY PRZYCISK KONTROLNY
         orb.addEventListener('click', () => {
             zainicjujAudio(); 
             if (orb.innerText === "START") {
                 wlaczWakeLock();
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
-                speakText("Cześć Maciej! Jestem gotowy. W czym mogę pomóc?");
+                speakText("Cześć Maciej! W czym mogę pomóc?");
             } 
             else if (orb.innerText === "Zzz..." || orb.innerText === "BŁĄD") {
                 startListening();
             } 
             else if (orb.innerText === "Słucham..." || orb.innerText === "Myślę..." || orb.innerText === "Komenda...") {
-                // RĘCZNY RESET: Jeśli się zawiesi na "Myślę..." lub "Słucham...", kliknięcie go uśpi i zresetuje.
                 try { recognition.stop(); } catch(e) {}
-                if (currentAbortController) currentAbortController.abort(); // Przerywa żądanie do Google AI
+                if (currentAbortController) currentAbortController.abort();
                 
                 czyAIPrzetwarza = false;
                 trybKomendy = false;
@@ -249,12 +238,9 @@
             czyAIPrzetwarza = true; 
             const originalTranscript = event.results[0][0].transcript;
             
-            // Czyszczenie ze znaków interpunkcyjnych, żeby wykrywać komendy niezależnie od kropek
             const cleanTranscript = originalTranscript.toLowerCase().replace(/[.,!?]/g, "").trim();
             userMsg.innerText = "Ty: " + originalTranscript;
 
-            // OBSŁUGA KOMEND GŁOSOWYCH: 
-            // Działa, gdy jesteśmy w trybie komendy ALBO gdy powiesz wszystko na jednym tchu
             if (trybKomendy || cleanTranscript.includes("okej robot") || cleanTranscript.includes("ok robot")) {
                 
                 let emocjaESP = null;
@@ -266,7 +252,6 @@
                 else if (cleanTranscript.includes("myśl")) emocjaESP = "THINKING";
                 
                 if (emocjaESP) {
-                    // Wykryto emocję - wysyłamy od razu
                     trybKomendy = false;
                     czyAIPrzetwarza = false;
                     simulateESP32(emocjaESP);
@@ -277,21 +262,19 @@
                     robotMsg.innerText = "*Wysłano komendę: " + emocjaESP + "*";
                     return; 
                 } else {
-                    // Wykryto słowo wybudzające, ale nie ma jeszcze emocji - czekamy
+
                     trybKomendy = true;
                     czyAIPrzetwarza = false;
                     zagrajDzwiek(1200, 0.1); 
                     
                     orb.className = 'listening';
                     orb.innerText = "Komenda...";
-                    robotMsg.innerText = "*Czekam na nazwę emocji (np. radość, złość, smutek)...*";
                     
                     setTimeout(() => { try { recognition.start(); } catch(e){} }, 500);
                     return; 
                 }
             }
 
-            // STANDARDOWE ZAPYTANIE DO AI (jeśli to nie była komenda)
             robotMsg.innerText = "";
             orb.className = 'thinking';
             orb.innerText = "Myślę...";
@@ -316,11 +299,9 @@
         async function askGemini(text) {
             simulateESP32("THINKING");
             
-            // Zabezpieczenie przed starym, zawieszonym zapytaniem
             if (currentAbortController) currentAbortController.abort();
             currentAbortController = new AbortController();
             
-            // Bezpiecznik wydłużony do 15 sekund
             const timeoutId = setTimeout(() => {
                 if (currentAbortController) currentAbortController.abort();
             }, 15000); 
@@ -357,7 +338,6 @@
                 processAIResponse(aiText);
 
             } catch (error) {
-                // Jeśli przerwano ręcznie (kliknięciem w kulę) lub z powodu czasu
                 if (error.name === 'AbortError') {
                     robotMsg.innerText = "*Oczekiwano zbyt długo lub przerwano.*";
                 } else {
