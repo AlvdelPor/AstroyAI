@@ -29,7 +29,6 @@
             text-align: center;
         }
         
-        /* Nowy przycisk Bluetooth */
         #ble-btn {
             position: absolute;
             top: 20px;
@@ -88,6 +87,7 @@
             margin-bottom: 20px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.5s ease;
         }
 
         .user-text { color: #94a3b8; margin-bottom: 12px; font-size: 1rem; font-style: italic; }
@@ -112,31 +112,45 @@
     <script>
         const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg"; 
         let historiaRozmowy = [];
-        let czyAIPrzetwarza = false; // Flaga blokująca usypianie podczas myślenia
-        let wakeLock = null; // Blokada wygaszacza ekranu
+        let czyAIPrzetwarza = false; 
+        let wakeLock = null; 
+        
+        let trybKomendy = false; // Flaga nasłuchiwania komend
+        let audioCtx = null; // Kontekst audio do pikania
 
         // ==========================================
-        // WAKE LOCK - Blokowanie gaszenia ekranu
+        // DŹWIĘKI I WAKE LOCK
         // ==========================================
+        function zainicjujAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function zagrajDzwiek(czestotliwosc, czas) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(czestotliwosc, audioCtx.currentTime);
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + czas);
+        }
+
         async function wlaczWakeLock() {
             try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
+                if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
             } catch (err) {
                 console.log(`Błąd Wake Lock: ${err.message}`);
             }
         }
         
-        // Ponów blokadę, gdyby użytkownik zminimalizował aplikację i wrócił
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                wlaczWakeLock();
-            }
+            if (wakeLock !== null && document.visibilityState === 'visible') wlaczWakeLock();
         });
 
         // ==========================================
-        // OBSŁUGA BLUETOOTH
+        // OBSŁUGA BLUETOOTH I UI
         // ==========================================
         let bleCharacteristic = null;
         const bleBtn = document.getElementById('ble-btn');
@@ -158,9 +172,18 @@
                 bleBtn.style.color = "#00ff88";
                 bleBtn.style.borderColor = "#00ff88";
                 
-                // POPRAWKA UI: Usuwamy symulator twarzy i powiększamy kulę, Flexbox resztę wyśrodkuje sam!
-                document.getElementById('esp-simulator').style.display = 'none';
-                document.getElementById('orb').style.transform = 'scale(1.15)';
+                // POPRAWKA UI: Zachowanie stabilnego układu
+                const espSim = document.getElementById('esp-simulator');
+                espSim.style.visibility = 'hidden';
+                espSim.style.height = '0px';
+                espSim.style.marginTop = '0px';
+                espSim.style.marginBottom = '0px';
+                
+                // Kula w dół o kilkanaście pikseli i odrobinę większa
+                document.getElementById('orb').style.transform = 'scale(1.1) translateY(12px)';
+                
+                // Uzupełnienie przestrzeni, żeby czat nie podskoczył
+                document.getElementById('chat-box').style.marginTop = '75px'; 
                 
                 sendToESP32("IDLE"); 
             } catch (error) {
@@ -173,9 +196,7 @@
                 try {
                     let encoder = new TextEncoder();
                     await bleCharacteristic.writeValue(encoder.encode(emotion));
-                } catch (error) {
-                    console.error("Błąd wysyłania: ", error);
-                }
+                } catch (error) {}
             }
         }
         // ==========================================
@@ -196,18 +217,16 @@
             dostepneGlosy = window.speechSynthesis.getVoices();
         };
 
-        // GŁÓWNY PRZYCISK (KULA)
         orb.addEventListener('click', () => {
+            zainicjujAudio(); // Pozwól przeglądarce na odtwarzanie dźwięków
             if (orb.innerText === "START") {
                 wlaczWakeLock();
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
                 speakText("Cześć Maciej! Jestem gotowy. W czym mogę pomóc?");
             } else if (orb.innerText === "Zzz..." || orb.innerText === "BŁĄD") {
-                // Wybudzanie
                 startListening();
             } else if (orb.innerText === "Słucham...") {
-                // Bezpiecznik: jeśli się zawiesi, kliknięcie usypia go ręcznie
                 try { recognition.stop(); } catch(e) {}
                 czyAIPrzetwarza = false;
                 orb.className = '';
@@ -218,6 +237,7 @@
 
         function startListening() {
             czyAIPrzetwarza = false;
+            trybKomendy = false;
             orb.className = 'listening';
             orb.innerText = "Słucham...";
             sendToESP32("IDLE");
@@ -225,21 +245,57 @@
         }
 
         recognition.onresult = (event) => {
-            czyAIPrzetwarza = true; // Rozpoczęto myślenie, ignorujemy timeout mikrofonu
-            const transcript = event.results[0][0].transcript;
-            userMsg.innerText = "Ty: " + transcript;
+            czyAIPrzetwarza = true; 
+            const originalTranscript = event.results[0][0].transcript;
+            const transcript = originalTranscript.toLowerCase().trim();
+            userMsg.innerText = "Ty: " + originalTranscript;
+
+            // 1. FAZA: WYKONANIE KOMENDY
+            if (trybKomendy) {
+                trybKomendy = false;
+                czyAIPrzetwarza = false;
+                let emocjaESP = "IDLE";
+                
+                if (transcript.includes("radość") || transcript.includes("wesoł")) emocjaESP = "HAPPY";
+                else if (transcript.includes("smutek") || transcript.includes("smutn")) emocjaESP = "SAD";
+                else if (transcript.includes("złość") || transcript.includes("zły")) emocjaESP = "ANGRY";
+                else if (transcript.includes("strach") || transcript.includes("bój")) emocjaESP = "SCARED";
+                else if (transcript.includes("zaskoczenie") || transcript.includes("dziw")) emocjaESP = "SURPRISED";
+                else if (transcript.includes("myśl")) emocjaESP = "THINKING";
+                
+                simulateESP32(emocjaESP);
+                zagrajDzwiek(600, 0.2); // Piknięcie wykonania
+                
+                orb.className = '';
+                orb.innerText = "Zzz...";
+                robotMsg.innerText = "*Wysłano komendę: " + emocjaESP + "*";
+                return; // Przerywamy, nie wysyłamy do AI
+            }
+
+            // 2. FAZA: NASŁUCHIWANIE NA SŁOWO "HEJ ASTROY"
+            if (transcript.includes("hej astroj") || transcript.includes("hej astroy")) {
+                trybKomendy = true;
+                czyAIPrzetwarza = false;
+                zagrajDzwiek(1200, 0.1); // Piknięcie gotowości
+                
+                orb.className = 'listening';
+                orb.innerText = "Komenda...";
+                robotMsg.innerText = "*Czekam na nazwę emocji (np. radość, złość, smutek)...*";
+                
+                setTimeout(() => { try { recognition.start(); } catch(e){} }, 500);
+                return; // Przerywamy, nie wysyłamy do AI
+            }
+
+            // 3. FAZA: STANDARDOWE ZAPYTANIE DO AI
             robotMsg.innerText = "";
-            
             orb.className = 'thinking';
             orb.innerText = "Myślę...";
             
-            askGemini(transcript); 
+            askGemini(originalTranscript); 
         };
 
-        // NOWOŚĆ: Logika usypiania zamiast błędu
         recognition.onend = () => {
             if (!czyAIPrzetwarza) {
-                // Mikrofon wyłączył się z powodu ciszy
                 orb.className = '';
                 orb.innerText = "Zzz...";
                 sendToESP32("IDLE");
@@ -255,6 +311,10 @@
         async function askGemini(text) {
             simulateESP32("THINKING");
             
+            // BEZPIECZNIK CZASOWY: 10 Sekund
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); 
+
             const promptSystemowy = "Jesteś biurkowym robotem Macieja o imieniu Astory, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
 
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
@@ -262,6 +322,7 @@
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`, {
                     method: 'POST',
+                    signal: controller.signal, // Przekazanie sygnału przerwania
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: promptSystemowy }] },
@@ -269,6 +330,8 @@
                         generationConfig: { temperature: 0.3 }
                     })
                 });
+
+                clearTimeout(timeoutId); // Sukces - wyłącz bezpiecznik
 
                 const data = await response.json();
                 
@@ -284,9 +347,16 @@
                 processAIResponse(aiText);
 
             } catch (error) {
-                robotMsg.innerText = "Błąd sieci: " + error;
-                historiaRozmowy.pop();
+                // OBSŁUGA BŁĘDU TIMEOUTU
+                if (error.name === 'AbortError') {
+                    robotMsg.innerText = "Serwer Google nie odpowiada. Przekroczono czas 10 sekund.";
+                } else {
+                    robotMsg.innerText = "Błąd sieci: " + error.message;
+                }
+                historiaRozmowy.pop(); // Cofnij wiadomość z historii
+                orb.className = '';
                 orb.innerText = "Zzz...";
+                sendToESP32("IDLE");
             }
         }
 
