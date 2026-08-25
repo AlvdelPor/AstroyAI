@@ -19,16 +19,14 @@ String currentEmotion = "IDLE";
 String lastEmotion = "IDLE";
 long emotionStartTime = 0; 
 
-// --- KONFIGURACJA 3 SERW ---
 Servo armLeft;
 Servo armRight;
-Servo baseServo; // Nowe serwo podstawy!
+Servo baseServo;
 
 #define PIN_SERVO_BASE 25
 #define PIN_SERVO_LEFT 26
 #define PIN_SERVO_RIGHT 27
 
-// Marginesy rąk
 int limitL_Down = 20;  
 int limitL_Up = 160;   
 int limitR_Down = 160; 
@@ -118,7 +116,6 @@ void updateServos(String emotion) {
         }
     }
     else if (emotion == "THINKING") {
-        // Podstawa nieruchomo na wprost, tylko drapanie po głowie
         baseServo.write(90); 
         int scratchCycle = (elapsed / 500) % 4; 
         int scratchMotion = (scratchCycle <= 1) ? (sin(time / 150.0) * 15) : 0;
@@ -126,7 +123,6 @@ void updateServos(String emotion) {
         armRight.write(limitR_Down); 
     } 
     else if (emotion == "CONFUSED") {
-        // Nieruchomy obrót w bok (jakby nasłuchiwał) i wzruszenie ramionami
         baseServo.write(120); 
         int shrug = sin(elapsed / 400.0) * 20;
         if(shrug < 0) shrug = 0; 
@@ -135,7 +131,6 @@ void updateServos(String emotion) {
         armRight.write(limitR_Down - 30 - shrug);
     } 
     else {
-        // IDLE - CAŁKOWITY BEZRUCH MECHANICZNY
         baseServo.write(90);
         armLeft.write(limitL_Down); 
         armRight.write(limitR_Down); 
@@ -147,7 +142,6 @@ void setup() {
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
     display.clearDisplay();
     
-    // Alokacja timerów dla 3 serw!
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
     ESP32PWM::allocateTimer(2);
@@ -160,8 +154,7 @@ void setup() {
     armRight.attach(PIN_SERVO_RIGHT, 500, 2400);
     baseServo.attach(PIN_SERVO_BASE, 500, 2400);
     
-    // Reset pozycji startowej
-    baseServo.write(90); // Patrzy na wprost
+    baseServo.write(90);
     delay(200);
     armLeft.write(limitL_Down); 
     delay(200);
