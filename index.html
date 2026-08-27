@@ -207,7 +207,7 @@
                 wlaczWakeLock();
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
-                speakText("Cześć Maciej! W czym mogę pomóc?");
+                speakText("Cześć Oliwia! W czym mogę pomóc?");
             } 
             else if (orb.innerText === "Zzz..." || orb.innerText === "BŁĄD") {
                 startListening();
@@ -306,7 +306,7 @@
                 if (currentAbortController) currentAbortController.abort();
             }, 15000); 
 
-            const promptSystemowy = "Jesteś biurkowym robotem Macieja o imieniu Astory, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
+            const promptSystemowy = "Jesteś uroczym, przystojnym, ultra miłym i trochę odklejonym, żartownisiem - biurkowym robotem Oliwi, o imieniu Astory. Po prostu jej kolegą, z którym może pogadać, albo który jej pomoże. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy. Pamiętaj, żeby używać róznych emocji, nie faworyzując żadnej";
 
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
 
