@@ -17,7 +17,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 bool deviceConnected = false;
 String currentEmotion = "IDLE";
 String lastEmotion = "IDLE";
-String displayText = ""; // Nowa zmienna przechowująca tekst do wyświetlenia
+String displayText = ""; // Zmienna przechowująca tekst
 long emotionStartTime = 0; 
 
 Servo armLeft;
@@ -49,12 +49,12 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         String value = pChar->getValue();
         value.trim(); 
         if (value.length() > 0) {
-            // SPRAWDZANIE NOWEGO PROTOKOŁU TEKSTOWEGO
-            if (value.startsWith("Z:") || value.startsWith("M:") || value.startsWith("W:")) {
+            // UNIWERSALNY PROTOKÓŁ TEKSTOWY "T:"
+            if (value.startsWith("T:")) {
                 currentEmotion = "TEXT";
-                displayText = value.substring(2); // Odcina przedrostek, zostawia samą wartość
+                displayText = value.substring(2); // Ucinamy "T:" i zostawiamy sam tekst
             } else {
-                currentEmotion = value; // Standardowe emocje twarzy
+                currentEmotion = value; 
             }
         }
     }
@@ -130,7 +130,7 @@ void updateServos(String emotion) {
             moveLeft(limitL_Up - 20); 
             moveRight(limitR_Up + 20);
         } else {
-            moveLeft(90);
+            moveLeft(90); 
             moveRight(90);
         }
     }
@@ -159,7 +159,7 @@ void updateServos(String emotion) {
         moveRight(limitR_Down - 30 - shrug);
     } 
     else {
-        // IDLE (Spoczynek) ORAZ TRYB TEKSTOWY
+        // IDLE (Spoczynek) i TEXT
         baseServo.write(90);
         moveLeft(limitL_Down); 
         moveRight(limitR_Down); 
@@ -207,12 +207,11 @@ void setup() {
 void drawFace(String emotion) {
     display.clearDisplay();
     
-    // OBSŁUGA WYŚWIETLANIA TEKSTU (Zegar, Minutnik, Pogoda)
+    // WYSWIETLANIE TEKSTU
     if (emotion == "TEXT") {
         display.setTextSize(3); 
         display.setTextColor(WHITE);
         
-        // Magia centrowania tekstu Adafruit GFX
         int16_t x1, y1;
         uint16_t w, h;
         display.getTextBounds(displayText, 0, 0, &x1, &y1, &w, &h);
@@ -220,7 +219,7 @@ void drawFace(String emotion) {
         
         display.print(displayText);
         display.display();
-        return; // Zakończ funkcję, żeby nie rysować twarzy
+        return; 
     }
 
     long time = millis();
