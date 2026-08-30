@@ -109,7 +109,8 @@
     </div>
 
     <script>
-        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg";
+        const API_KEY = "AQ.Ab8RN6IbzTzv0o25_lU8NIzMv81-XePYvjV4aSPPu0Qje5vqkg
+";
         let historiaRozmowy = [];
         let czyAIPrzetwarza = false; 
         let wakeLock = null; 
@@ -117,6 +118,7 @@
         let trybKomendy = false; 
         let audioCtx = null; 
         let currentAbortController = null;
+        let timerInterval = null; // Obsługa naszego nowego minutnika
 
         function zainicjujAudio() {
             if (!audioCtx) {
@@ -167,7 +169,6 @@
                 bleBtn.style.borderColor = "#00ff88";
                 
                 document.getElementById('esp-simulator').style.visibility = 'hidden';
-                
                 document.getElementById('orb').style.transform = 'scale(1.05) translateY(5px)';
                 
                 sendToESP32("IDLE"); 
@@ -201,27 +202,32 @@
             dostepneGlosy = window.speechSynthesis.getVoices();
         };
 
+        function resetToZzz() {
+            czyAIPrzetwarza = false;
+            trybKomendy = false;
+            orb.className = '';
+            orb.innerText = "Zzz...";
+            if(!timerInterval) sendToESP32("IDLE"); // Nie wysyłaj IDLE, jeśli trwa odliczanie
+        }
+
         orb.addEventListener('click', () => {
             zainicjujAudio(); 
             if (orb.innerText === "START") {
                 wlaczWakeLock();
                 status.style.display = 'none'; 
                 simulateESP32("HAPPY");
-                speakText("Cześć Oliwia! W czym mogę pomóc?");
+                speakText("Cześć Maciej! W czym mogę pomóc?");
             } 
             else if (orb.innerText === "Zzz..." || orb.innerText === "BŁĄD") {
                 startListening();
             } 
-            else if (orb.innerText === "Słucham..." || orb.innerText === "Myślę..." || orb.innerText === "Komenda...") {
+            else if (orb.innerText === "Słucham..." || orb.innerText === "Myślę..." || orb.innerText === "Komenda..." || orb.innerText === "Timer") {
                 try { recognition.stop(); } catch(e) {}
                 if (currentAbortController) currentAbortController.abort();
+                if (timerInterval) clearInterval(timerInterval); timerInterval = null;
                 
-                czyAIPrzetwarza = false;
-                trybKomendy = false;
-                orb.className = '';
-                orb.innerText = "Zzz...";
                 robotMsg.innerText = "*Zresetowano na żądanie*";
-                sendToESP32("IDLE");
+                resetToZzz();
             }
         });
 
@@ -230,19 +236,90 @@
             trybKomendy = false;
             orb.className = 'listening';
             orb.innerText = "Słucham...";
-            sendToESP32("IDLE");
+            if(!timerInterval) sendToESP32("IDLE"); 
             try { recognition.start(); } catch(e) {}
+        }
+
+        // =====================================
+        // LOGIKA MINUTNIKA W TLE
+        // =====================================
+        function startTimer(seconds) {
+            if(timerInterval) clearInterval(timerInterval);
+            trybKomendy = false;
+            czyAIPrzetwarza = false;
+            orb.className = '';
+            orb.innerText = "Timer";
+            
+            timerInterval = setInterval(() => {
+                seconds--;
+                if (seconds < 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    simulateESP32("SURPRISED"); 
+                    zagrajDzwiek(800, 0.5); setTimeout(() => zagrajDzwiek(1200, 1), 500);
+                    robotMsg.innerText = "*Koniec czasu!*";
+                    setTimeout(() => resetToZzz(), 3000);
+                    return;
+                }
+                // Formatowanie czasu, np. 04:05
+                let m = Math.floor(seconds / 60).toString().padStart(2, '0');
+                let s = (seconds % 60).toString().padStart(2, '0');
+                sendToESP32("M:" + m + ":" + s); 
+                robotMsg.innerText = `*Odliczanie: ${m}:${s}*`;
+            }, 1000);
         }
 
         recognition.onresult = (event) => {
             czyAIPrzetwarza = true; 
             const originalTranscript = event.results[0][0].transcript;
-            
-            const cleanTranscript = originalTranscript.toLowerCase().replace(/[.,!?]/g, "").trim();
+            let cleanTranscript = originalTranscript.toLowerCase().replace(/[.,!?]/g, "").trim();
             userMsg.innerText = "Ty: " + originalTranscript;
+
+            // Zmiana słów na liczby (na wypadek, gdyby API zapisało słownie)
+            const mapLiczb = {"jeden":1, "jedną":1, "dwa":2, "dwie":2, "trzy":3, "cztery":4, "pięć":5, "sześć":6, "siedem":7, "osiem":8, "dziewięć":9, "dziesięć":10};
+            for(let slowo in mapLiczb) { cleanTranscript = cleanTranscript.replace(slowo, mapLiczb[slowo]); }
 
             if (trybKomendy || cleanTranscript.includes("okej robot") || cleanTranscript.includes("ok robot")) {
                 
+                // FUNKCJA 1: GODZINA
+                if (cleanTranscript.includes("godzina") || cleanTranscript.includes("godzinę") || cleanTranscript.includes("czas")) {
+                    const now = new Date();
+                    const timeStr = "Z:" + now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+                    sendToESP32(timeStr);
+                    robotMsg.innerText = "*Wyświetlam godzinę na ekranie*";
+                    setTimeout(() => resetToZzz(), 6000); // Wyświetla przez 6 sek i wraca
+                    return;
+                }
+                
+                // FUNKCJA 2: POGODA (API Open-Meteo, koordynaty dla Wrocławia)
+                if (cleanTranscript.includes("pogoda") || cleanTranscript.includes("pogodę") || cleanTranscript.includes("temperatura")) {
+                    robotMsg.innerText = "*Sprawdzam chmury we Wrocławiu...*";
+                    fetch('https://api.open-meteo.com/v1/forecast?latitude=51.10&longitude=17.03&current_weather=true')
+                        .then(res => res.json())
+                        .then(data => {
+                            const temp = Math.round(data.current_weather.temperature);
+                            sendToESP32("W:" + temp + "C");
+                            robotMsg.innerText = `*Aktualna temperatura: ${temp}°C*`;
+                            setTimeout(() => resetToZzz(), 6000); 
+                        }).catch(() => resetToZzz());
+                    return;
+                }
+
+                // FUNKCJA 3: MINUTNIK (Wyciąganie minut/sekund z tekstu)
+                if (cleanTranscript.includes("minutnik") || cleanTranscript.includes("odliczanie") || cleanTranscript.includes("stoper")) {
+                    let timeInSecs = 0;
+                    let matchMin = cleanTranscript.match(/(\d+)\s*minut/);
+                    let matchSec = cleanTranscript.match(/(\d+)\s*sekund/);
+                    if (matchMin) timeInSecs += parseInt(matchMin[1]) * 60;
+                    if (matchSec) timeInSecs += parseInt(matchSec[1]);
+                    
+                    if (timeInSecs === 0) timeInSecs = 60; // Domyślnie 1 minuta
+                    
+                    startTimer(timeInSecs);
+                    return;
+                }
+
+                // EMOCJE (Podstawa)
                 let emocjaESP = null;
                 if (cleanTranscript.includes("radość") || cleanTranscript.includes("wesoł")) emocjaESP = "HAPPY";
                 else if (cleanTranscript.includes("smutek") || cleanTranscript.includes("smutn")) emocjaESP = "SAD";
@@ -252,41 +329,32 @@
                 else if (cleanTranscript.includes("myśl")) emocjaESP = "THINKING";
                 
                 if (emocjaESP) {
-                    trybKomendy = false;
-                    czyAIPrzetwarza = false;
                     simulateESP32(emocjaESP);
                     zagrajDzwiek(600, 0.2); 
-                    
-                    orb.className = '';
-                    orb.innerText = "Zzz...";
                     robotMsg.innerText = "*Wysłano komendę: " + emocjaESP + "*";
+                    resetToZzz();
                     return; 
                 } else {
-
                     trybKomendy = true;
                     czyAIPrzetwarza = false;
                     zagrajDzwiek(1200, 0.1); 
-                    
                     orb.className = 'listening';
                     orb.innerText = "Komenda...";
-                    
                     setTimeout(() => { try { recognition.start(); } catch(e){} }, 500);
                     return; 
                 }
             }
 
+            // ROZMOWA Z AI
             robotMsg.innerText = "";
             orb.className = 'thinking';
             orb.innerText = "Myślę...";
-            
             askGemini(originalTranscript); 
         };
 
         recognition.onend = () => {
-            if (!czyAIPrzetwarza) {
-                orb.className = '';
-                orb.innerText = "Zzz...";
-                sendToESP32("IDLE");
+            if (!czyAIPrzetwarza && !trybKomendy) {
+                resetToZzz();
             }
         };
 
@@ -306,7 +374,7 @@
                 if (currentAbortController) currentAbortController.abort();
             }, 15000); 
 
-            const promptSystemowy = "Jesteś uroczym, przystojnym, ultra miłym i trochę odklejonym, żartownisiem - biurkowym robotem Oliwi, o imieniu Astory. Po prostu jej kolegą, z którym może pogadać, albo który jej pomoże. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy. Pamiętaj, żeby używać róznych emocji, nie faworyzując żadnej";
+            const promptSystemowy = "Jesteś biurkowym robotem Macieja o imieniu Astory, jego kumplem z kim może pogadać przy pracy, ale też któremu możesz pomóc w jakiś prostych sprawach. Twoje odpowiedzi muszą być krótkie (1-2 zdania). Na samym początku KAŻDEJ odpowiedzi ZAWSZE wstawiaj tag emocji w nawiasach kwadratowych: [HAPPY], [SAD], [ANGRY], [THINKING], [CONFUSED], [SURPRISED], [SCARED]. BARDZO WAŻNE: Używaj TYLKO czystego tekstu. Nie używaj absolutnie żadnych znaków specjalnych (gwiazdek, podkreśleń), emotikonów, ani angielskich wtrąceń, bo czyta to syntezator mowy.";
 
             historiaRozmowy.push({ role: "user", parts: [{ text: text }] });
 
@@ -329,7 +397,7 @@
                 if(data.error) {
                     robotMsg.innerText = "Błąd API: " + data.error.message;
                     historiaRozmowy.pop();
-                    orb.innerText = "Zzz...";
+                    resetToZzz();
                     return;
                 }
 
@@ -344,9 +412,7 @@
                     robotMsg.innerText = "Błąd sieci: " + error.message;
                 }
                 historiaRozmowy.pop(); 
-                orb.className = '';
-                orb.innerText = "Zzz...";
-                sendToESP32("IDLE");
+                resetToZzz();
             }
         }
 
@@ -374,7 +440,8 @@
             else if(emotion === "SCARED") espSimulator.innerText = "😨";
             else espSimulator.innerText = "🤖"; 
             
-            sendToESP32(emotion);
+            // Wysyłaj zmianę grafiki tylko jeśli na ekranie nie leci nam aktualnie odliczanie czasu
+            if(!timerInterval) sendToESP32(emotion);
         }
 
         function speakText(text) {
